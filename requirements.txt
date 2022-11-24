@@ -1,0 +1,10 @@
+requests
+bs4
+re
+pandas
+seaborn
+matplotlib
+fpdf
+warnings
+signal
+sys

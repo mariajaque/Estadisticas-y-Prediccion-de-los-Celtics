@@ -39,7 +39,7 @@ class PDF(FPDF):
         self.cell(0, 40, 'Boston Celtics Statistics', ln=True, align='C')
         self.set_font('times', '', 25)
         self.cell(0, 25, '2022', ln=True, align='C')
-        self.image('celtics_logo.jpg', x = 50, y = 120, w = 100)
+        self.image('logo.svg', x=50, y=120, w=100)
 
 
 def handler_signal(signal,frame):
@@ -47,14 +47,15 @@ def handler_signal(signal,frame):
     # Salida controlada del programa en caso de pulsar
     # control C
 
-    print("\n\n [!] out .......\ n")
+    print("Salida ordenada del sistema")
 
     sys.exit(1)
 
-signal.signal(signal.SIGINT,handler_signal)
+
+signal.signal(signal.SIGINT, handler_signal)
 
 
-def extract_api():
+def extract_api(fichero):
 
     # Se extrae la información sobre las estadísticas de todos los equipos
     # de una API de deportes.
@@ -62,8 +63,13 @@ def extract_api():
     # Para poder accerder hay que cambiar 'xxxxxxxxxxx' por la clave que
     # nos asigna la API al registrarnos
 
+    with open(fichero, 'r') as f:
+        texto = f.read()
+
+    key = eval(texto)['key']
+
     headers = {
-            'Ocp-Apim-Subscription-Key': 'e7da973922a641f79d7b9e34feec85c1'
+            'Ocp-Apim-Subscription-Key': key
             }
 
     # Recibimos las respuestas y estas se almacenan en una lista con diccionarios
@@ -77,6 +83,12 @@ def extract_api():
 
     response_players = requests.get('https://api.sportsdata.io/v3/nba/stats/json/PlayerSeasonStatsByTeam/2022/BOS', headers=headers)
     players_lista = response_players.json()
+
+    # Obtenemos y almacenamos el logo del equipo
+    logo = open('logo.svg', 'wb')
+    a = requests.get('https://upload.wikimedia.org/wikipedia/en/8/8f/Boston_Celtics.svg')
+    logo.write(a.content)
+    logo.close()
 
     return stats_list, players_lista
 
@@ -100,7 +112,7 @@ def transform_api(stats_list, player_lista):
     # los jugadores.
 
     df_players = pd.DataFrame(player_lista)
-    df_reducido = df_players[['Name', 'Position', 'Games', 'FantasyPoints', 
+    df_reducido = df_players[['Name', 'Position', 'Games', 'FantasyPoints',
                                 'Minutes', 'Seconds', 'EffectiveFieldGoalsPercentage',
                                 'TwoPointersPercentage', 'ThreePointersPercentage',
                                 'FreeThrowsPercentage', 'OffensiveReboundsPercentage',
@@ -109,6 +121,7 @@ def transform_api(stats_list, player_lista):
                                 'AssistsPercentage', 'StealsPercentage', 'BlocksPercentage',
                                 'TurnOversPercentage', 'UsageRatePercentage',
                                 'DoubleDoubles', 'TripleDoubles']]
+
 
     # Se crea un pdf que contendrá las gráficas de las
     # estadísticas del equipo
@@ -124,12 +137,6 @@ def create_pdf(dict_team_stats, df_reducido):
 
     pdf = PDF('P', 'mm')
     create_graphs_team(dict_team_stats, df_reducido)
-
-    # Establecemos que cambie de página automáticamente
-    # Establecemos que cambie de página cuando esté a 12mm del final de la
-    # página
-
-    pdf.set_auto_page_break(auto=True, margin=100)
 
     # Añadimos una página y la portada del reporte
     pdf.add_page()
@@ -166,7 +173,7 @@ def create_pdf(dict_team_stats, df_reducido):
     # de cada jugador
 
     pdf.cell(0, 25, 'Player Stats Table:', ln=True)
-    pdf.image('player_stats_table.jpg', x=10, y=pdf.get_y() + 5, w=190, h=80)
+    pdf.image('player_stats_table.jpg', x=10, y=pdf.get_y() + 5, w=190, h=250)
     pdf.add_page()
 
     # En la siguiente página se añaden las gráficas de los 5
@@ -230,12 +237,20 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # Finalmente se crea y guarda el gráfico table con la información
     # contenida en el dataset
 
-    fig = plt.figure(figsize=(10,10))
-    ax = plt.subplot(48, 2, 1, frameon=False)
-    ax.xaxis.set_visible(False)
-    ax.yaxis.set_visible(False)
-    pd.plotting.table(ax, data = df, loc = 'center')
-    plt.savefig('team_stats_table.jpg', dpi=300, bbox_inches='tight')
+    fig, ax = plt.subplots(figsize=(10, 15))
+    ax.axis('off')
+    ax.table(
+             cellText=df.values,
+             colLabels=df.columns.values,
+             rowLabels=df.index.tolist(),
+             rowColours=['#c2e5d2']*len(df.index.tolist()),
+             cellLoc='center',
+             loc='center',
+             colColours=['#91d1ae']*len(df.columns.values.tolist()),
+             colWidths=[0.7, 0.5]
+            )
+    plt.savefig('team_stats_table.jpg', dpi=300)
+
 
     # PIE CHART CON LOS RESULTADOS GLOBALES DE LOS PARTIDOS:
 
@@ -244,7 +259,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # A la gráfica se le añaden los porcentajes de ganados y
     # de perdidos
 
-    fig = plt.figure(figsize=(7,7))
+    plt.figure(figsize=(7,7))
     plt.pie([dict_team_stats['Wins'], dict_team_stats['Losses']], labels=['Wins', 'Losses'], colors=['seagreen', 'darkseagreen'], autopct='%1.1f%%')
     plt.title('GLOBAL RESULTS OF MATCHES', fontsize = 20, fontweight = 'bold')
     plt.savefig('global_results.jpg', dpi=300, bbox_inches='tight')
@@ -269,7 +284,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
 
     # Se crea el barplot con la información contenida en el dataframe
 
-    fig = plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,10))
     ax = sns.barplot(datos, y='Percentages', x='Throws Percentage Stats', orient='h', palette=sns.light_palette('seagreen', reverse=True))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('SHOOTING PERCENTAGES', fontsize=20, fontweight='bold')
@@ -295,7 +310,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
 
     # Se crea el barplot con la información contenida en el dataframe
 
-    fig = plt.figure(figsize=(10,8))
+    plt.figure(figsize=(10,8))
     ax = sns.barplot(datos, x='Doubles', y='doubles stats', orient='v', palette=sns.light_palette('seagreen', reverse=True, n_colors=3))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('DOUBLES', fontsize=20, fontweight='bold')
@@ -306,18 +321,24 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # Se crea una tabla con los valores de las estadísticas
     # más relevantes por jugador:
 
-    fig = plt.figure(figsize=(40,5))
-    ax = plt.subplot(1, 1, 1, frameon=False)
-    ax.xaxis.set_visible(False)
-    ax.yaxis.set_visible(False)
-    pd.plotting.table(ax, data = df_reducido.transpose(), loc = 'center')
-    plt.savefig('player_stats_table.jpg', dpi=300, bbox_inches='tight')
+    fig, ax = plt.subplots(figsize=(40, 20))
+    ax.axis('off')
+    ax.table(
+             cellText=df_reducido.transpose().values,
+             colLabels=df_reducido.transpose().columns.values,
+             rowLabels=df_reducido.transpose().index.tolist(),
+             rowColours=['#c2e5d2']*len(df_reducido.transpose().index.tolist()),
+             cellLoc='center',
+             loc='center',
+             colColours=['#91d1ae']*len(df_reducido.transpose().columns.values.tolist())
+            )
+    plt.savefig('player_stats_table.jpg', dpi=300)
 
     # TOP 5 ANOTADORES DEL EQUIPO
 
     # Barplot con los cinco máximos anotadores de los celtics
     max_anotadores = df_reducido.nlargest(5, ['Points'])
-    fig = plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,10))
     ax = sns.barplot(max_anotadores, y='Points', x='Name', orient='v', palette=sns.light_palette('seagreen', reverse=True))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('TOP 5 SCORERS', fontsize=20, fontweight='bold')
@@ -326,7 +347,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # 5 JUGADORES QUE HAN MARCADO MENOS PUNTOS
 
     min_anotadores = df_reducido.nsmallest(5, ['Points'])
-    fig = plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,10))
     ax = sns.barplot(min_anotadores, y='Points', x='Name', orient='v', palette=sns.light_palette('seagreen'))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('LEAST 5 SCORERS', fontsize=20, fontweight='bold')
@@ -338,7 +359,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # jugadores más eficientes del equipo
 
     ef_rating = df_reducido.nlargest(5, ['PlayerEfficiencyRating'])
-    fig = plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,10))
     ax = sns.barplot(ef_rating, y='PlayerEfficiencyRating', x='Name', orient='v', palette=sns.light_palette('seagreen', reverse=True))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('MOST EFFICIENT PLAYERS', fontsize=20, fontweight='bold')
@@ -349,7 +370,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # Barplot con los 5 jugadores con menor eficiencia del equipo
 
     ef_rating_min = df_reducido.nsmallest(5, ['PlayerEfficiencyRating'])
-    fig = plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,10))
     ax = sns.barplot(ef_rating_min, y='PlayerEfficiencyRating', x='Name', orient='v', palette=sns.light_palette('seagreen', reverse=True))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('LEAST EFFICIENT PLAYERS', fontsize=20, fontweight='bold')
@@ -360,7 +381,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # Barplot con el porcentage de tiros de 2 anotados por cada
     # jugador y ordenado de mayor a menor porcentage
 
-    fig = plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,10))
     ax = sns.barplot(df_reducido.sort_values('TwoPointersPercentage', ascending=False), x='TwoPointersPercentage', y='Name', orient='h', palette=sns.light_palette('seagreen', 24, reverse=True))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('TWO POINTERS PERCENTAGE', fontsize=20, fontweight='bold')
@@ -371,7 +392,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # Barplot con los jugadores ordenados en función de su porcentage
     # de tiros libres anotados esta temporada
 
-    fig = plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,10))
     ax = sns.barplot(df_reducido.sort_values('ThreePointersPercentage', ascending=False), x='ThreePointersPercentage', y='Name', orient='h', palette=sns.light_palette('seagreen', 24,reverse=True))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('THREE POINTERS PERCENTAGE', fontsize=20, fontweight='bold')
@@ -382,7 +403,7 @@ def create_graphs_team(dict_team_stats, df_reducido):
     # Porcentage de tiros libres anotados por cada jugador representado
     # con un barplot ordenado de mayor a menor.
 
-    fig = plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,10))
     ax = sns.barplot(df_reducido.sort_values('FreeThrowsPercentage', ascending=False), x='FreeThrowsPercentage', y='Name', orient='h', palette=sns.light_palette('seagreen', 24, reverse=True))
     ax.bar_label(ax.containers[0], padding=5)
     plt.title('FREE THROWS', fontsize=20, fontweight='bold')
@@ -408,70 +429,63 @@ def extract_prediction():
 
 def transform_prediction(soup):
 
-    # Tras examinar detenidamente el código de la casa de apuestas
-    # podemos apreciar que tanto el nombre del partido como las cuotas
-    # se encuentran precedidas por la etiqueta "a".
-    # También debemos de tener en cuenta que los partidos aparecen en el
-    # código ordenados por orden cronológico y que las cuotas relacionadas
-    # a un partido concreto se encuentran en líneas inferiores a la que
-    # contiene el nombre del partido.
+    # En primer lugar extraemos todos los partidos ya que, tras
+    # examinar la página detenidamente podemos ver que
+    # siempre se encuentran dentro de una clase concreta
 
-    # Vamos a buscar la primera vez que aparezca el nombre del equipo
-    # ya que será en el nombre del próximo partido que vaya a disputar.
-    # Una vez que se tiene el siguiente partido se buscan en las líneas
-    # siguientes las cuotas de cada equipo, sabiendo que la primera
-    # cuota que aparezca hará referencia al primer nombre que salga
-    # en el título del partido y la segunda hará referencia al
-    # segundo nombre. Por tanto, una vez tengamos el siguiente partido
-    # los dos números que encontremos serán los de las cuotas.
+    partidos = soup.find_all(
+                             'div',
+                             {
+                                'class': 'cursor-pointer border rounded-md mb-4 px-1 py-2 flex flex-col lg:flex-row relative'
+                             }
+                            )
 
-    div_class = soup.find_all('a')
-    match = []
+    # Para cada uno de los partidos buscamos la palabra Celtics
     stats = []
 
-    for a in div_class:
+    for partido in partidos:
 
-        # Buscamos el siguiente partido en el que uno de los equipos
-        # que jueguen sean los Boston Celtics.
+        texto = partido.text
+        encontrado = re.findall('Boston Celtics', texto)
 
-        encontrado = re.findall('Celtics',str(a.text), re.I)
+        # En caso de que el partido sea de los Celtics
+        # se buscaran las cuotas y se agregarán a la lista de stats
+        # y se agregará el nombre del partido
 
-        # Solo agregaremos el primero que encontremos ya que van en
-        # órden cronológico.
+        if encontrado:
 
-        if encontrado != [] and len(match) < 1:
-            match.append(str(a.text))
+            match = partido.find_all('a', {'class':''})[0].text
+            cuotas = partido.find_all('span', {'class':'px-1 h-booklogosm font-bold bg-primary-yellow text-white leading-8 rounded-r-md w-14 md:w-18 flex justify-center items-center text-base'})
 
-        # En caso de que ya hayamos encontrado el siguiente partido
-        # buscamos los 2 siguientes números ya que serán las cuotas.
+            for cuota in cuotas:
+                stats.append(cuota.text)
+            break
 
-        if match != [] and len(stats) < 2:
+    if len(partidos) > 0:
+        # Limpiamos para obtener el nombre de los equipos
+        teams = match[1:-1].split(' - ')
 
-            encontrado = re.findall('\d\.\d*',str(a.text), re.I)
+        # El ganador será el de la cuota más baja:
+        ind_winner = stats.index(min(stats))
+        winner = teams[ind_winner]
 
-            if encontrado != []:
-                stats.append(float(encontrado[0]))
+        # Se devuelve el siguiente partido junto con el ganador
+        return (match[1:-1], winner)
 
-    # Sacamos los nombres de los 2 equipos.
-    # Uno de ellos será los celtics y el otro su adversario.
-
-    teams = match[0][1:-1].split(' - ')
-
-    # El ganador será el de la cuota más baja:
-
-    ind_winner = stats.index(min(stats))
-    winner = teams[ind_winner]
-
-    # Se devuelve el siguiente partido junto con el ganador
-    return (match[0][1:-1], winner)
+    else:
+        return None
 
 
 def load_prediction(prediction):
 
-    # Se muestra la predicción del siguiente partido por pantalla
+    if prediction:
+        # Se muestra la predicción del siguiente partido por pantalla
 
-    print(f'La predicción para el partido {prediction[0]} es que el ganador',
-            f'será {prediction[1]}')
+        print(f'La predicción para el partido {prediction[0]} es que el ganador',
+              f'será {prediction[1]}')
+
+    else:
+        print('No se ha encontrado el siguiente partido del equipo')
 
 
 if __name__ == '__main__':
@@ -479,7 +493,9 @@ if __name__ == '__main__':
     # ETL para obtener los datos de la API y cargarlos
     # en un pdf
 
-    stats_list, player_lista = extract_api()
+    config = 'config.txt'
+
+    stats_list, player_lista = extract_api(config)
     pdf = transform_api(stats_list, player_lista)
     load_api(pdf)
 

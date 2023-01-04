@@ -10,6 +10,7 @@ en las predicciones de las casas de apuestas.
 ## Antes de ejecutar
 
 Es de gran importancia hacer un pip install del requierements.txt
+
 '''
 $ pip install
 '''

@@ -1,5 +1,5 @@
 # Estadisticas-y-Prediccion-de-los-Celtics
-
+***
 El código de este repositorio permite generar de manera automática
 un reporte ejecutivo en pdf con las estadísticas el equipo de los
 Boston Celtics tonto a nivel de equipo como a nivel de jugadores
